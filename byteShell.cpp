@@ -4,6 +4,8 @@
 #include <sys/wait.h>
 #include <cstring>
 #include <map>
+#include <readline/readline.h>
+#include <readline/history.h>
 using namespace std;
 
 vector<string> history;
@@ -92,13 +94,17 @@ int main()
     string line;
     int status;
 
+    using_history();
+
     do
     {
-        cout << "> ";
-        getline(cin, line);
+        char *input = readline("> ");
+        line = input;
+        free(input);
         if (!line.empty())
             history.push_back(line);
         history_index = history.size();
+        add_history(line.c_str());
         vector<char *> args = split(line, ' ');
         status = execute(args.data());
     } while (status != -1);
