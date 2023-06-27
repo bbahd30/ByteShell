@@ -8,6 +8,27 @@
 #include <readline/history.h>
 using namespace std;
 
+struct Job
+{
+    Job(int id, pid_t pid, string command, string status = "running")
+    {
+        this->id = id;
+        this->pid = pid;
+        this->command = command;
+        this->status = status;
+    }
+    pid_t pid;
+    int id;
+    string command;
+    string status;
+};
+
+vector<Job> jobs;
+int nextJobID = 1;
+
+pid_t currentPID = 0;
+bool currentProcessStopped = false;
+
 vector<string> history;
 int history_index = 0;
 
@@ -15,12 +36,16 @@ int changeDirectory(vector<string> args);
 int showHistory(vector<string> args);
 int exitProgram(vector<string> args);
 int background(vector<string> args);
+int showJobs(vector<string> args);
+int killProgram(vector<string> args);
 
 map<string, int (*)(vector<string>)> builtins = {
     {"cd", changeDirectory},
     {"exit", exitProgram},
     {"history", showHistory},
-    {"bg", background}};
+    {"bg", background},
+    {"jobs", showJobs},
+    {"kill", killProgram}};
 
 vector<string> split(const string &str, char delimiter)
 {
@@ -36,7 +61,7 @@ int changeDirectory(vector<string> args)
 {
     cout << "Changing Directory\n";
     if (args.size() < 2)
-        cout << "Error: Expected argument to \"cd\"" << endl;
+        cout << "ByteShellError: Expected argument to \"cd\"" << endl;
     else if (chdir(args[1].c_str()) != 0)
         perror("ByteShellError");
     return 1;
@@ -45,12 +70,45 @@ int changeDirectory(vector<string> args)
 string command(vector<string> args)
 {
     string command = "";
-    for (auto arg : args)
+    for (auto it = args.begin(); it != args.end(); ++it)
     {
-        command += arg;
-        command += " ";
+        command += *it;
+        if (it != args.end() - 1)
+            command += " ";
     }
     return command;
+}
+
+int background(vector<string> args)
+{
+    if (args.size() < 2)
+    {
+        cout << "Error: No job ID specified\n";
+        return 1;
+    }
+
+    bool jobFound;
+    if (args[1][0] == '&')
+    {
+        int jobID = stoi(args[1]);
+        jobFound = false;
+        for (auto &job : jobs)
+        {
+            if (job.id == jobID)
+            {
+                jobFound = true;
+                pid_t pid = job.pid;
+                cout << "[" << jobID << "] " << job.command << " &" << endl;
+                kill(pid, SIGCONT);
+                break;
+            }
+        }
+        if (!jobFound)
+            cout << "Error: Job ID not found" << endl;
+    }
+    else
+        cout << "Error: Job ID must be followed by '%'" << endl;
+    return 1;
 }
 
 int showHistory(vector<string> args)
@@ -61,18 +119,35 @@ int showHistory(vector<string> args)
     return 1;
 }
 
-int background(vector<string> args)
-{
-    cout << "Bg";
-    return 1;
-}
-
 void handleSignal(int signal)
 {
-    int status;
-    pid_t pid;
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
-        cout << "Background process with PID " << pid << " completed" << endl;
+    if (signal == SIGCHLD)
+    {
+        int status;
+        pid_t pid;
+        while ((pid = waitpid(-1, &status, WNOHANG)) > 0)
+        {
+            for (auto it = jobs.begin(); it != jobs.end(); ++it)
+            {
+                if (pid == it->pid)
+                {
+                    cout << "Background process with PID " << pid << " completed: " << it->command << endl;
+                    showJobs({""});
+                    jobs.erase(it);
+                    break;
+                }
+            }
+        }
+    }
+    else if (signal == SIGTSTP && currentPID != 0)
+    {
+        cout << "Foreground process stopped: " << currentPID << endl;
+        Job job(jobs.size() + 1, currentPID, history.back(), "stopped");
+        jobs.push_back(job);
+        currentProcessStopped = true;
+        showJobs({""});
+        kill(currentPID, SIGSTOP);
+    }
 }
 
 int launchExtProgram(vector<string> args, bool backgroundProcess)
@@ -95,12 +170,15 @@ int launchExtProgram(vector<string> args, bool backgroundProcess)
     {
         if (!backgroundProcess)
         {
+            currentPID = pid;
             int status;
             waitpid(pid, &status, 0);
+            currentPID = 0;
         }
         else
         {
-            signal(SIGCHLD, handleSignal);
+            Job job(jobs.size() + 1, pid, command(args));
+            jobs.push_back(job);
             cout << "'" << command(args) << "' command initialized with PID: " << pid << endl;
         }
         return 1;
@@ -120,11 +198,30 @@ int execute(vector<string> args)
     int argsCount = args.size();
     bool backgroundProcess = (argsCount > 1 && args[argsCount - 1] == "&");
     if (backgroundProcess)
-    {
         args.pop_back();
-        cout << "Initializing background process\n";
-    }
     return launchExtProgram(args, backgroundProcess);
+}
+
+int showJobs(vector<string> args)
+{
+    cout << "Displaying background jobs" << endl;
+    for (auto &job : jobs)
+        cout << "[" << job.id << "] "
+             << "\t" << job.status << " " << job.command << endl;
+    return 1;
+}
+
+int killProgram(vector<string> args)
+{
+    if (args.size() == 0)
+    {
+        cout << "Usage: kill <pid>" << endl;
+        return 1;
+    }
+    int pid = stoi(args[1]);
+    if (kill(pid, SIGTERM) == -1)
+        perror("ByteShell");
+    return 1;
 }
 
 int exitProgram(vector<string> args)
@@ -138,6 +235,9 @@ int main()
     int status;
 
     using_history();
+
+    signal(SIGCHLD, handleSignal);
+    signal(SIGTSTP, handleSignal);
 
     do
     {
