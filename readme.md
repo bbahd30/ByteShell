@@ -1,4 +1,28 @@
-# ByteShell
+## Instructions to run
+
+The ByteShell uses the library readline for arrow based commands display and tab completion. Hence follow these commands to run:
+
+ 
+
+Clone the repository.
+
+```cpp
+git clone https://github.com/bbahd30/ByteShell.git
+```
+
+Install the readline development libraries
+
+```cpp
+sudo apt-get install libreadline-dev
+```
+
+Compile the code in the directory of ByteShell
+
+```cpp
+g++ byteShell.cpp -lreadline
+```
+
+Run the executable file and run commands.
 
 ### Shell Built-ins
 
@@ -82,19 +106,18 @@
             ```cpp
             if (!backgroundProcess)
             {
-            		int status;
+            	int status;
                 waitpid(pid, &status, 0);
             }
             else
             {
-            		signal(SIGCHLD, handleSignal);
+            	signal(SIGCHLD, handleSignal);
                 cout << "Background process created with PID: " << pid << endl;
             }
             ```
             
 - When a foreground process is stopped using the `Ctrl+Z`, the process is with status of ‘stopped’ is instantiated and pushed to `jobs` vector
     - the stopped process is resumed and run in background by using the `bg` command, which is implemented by using the `kill(pid, SIGCONT)` system call, which tells that process to restart.
-    
 
 ### `alias` command
 
@@ -107,3 +130,29 @@
 
 - This removes the set alias.
 - To remove all the aliases, the `-a` flag is used, which has been implement using a map.
+
+### `cd` command
+
+- `cd` stands for change directory.
+- This is implemented by using the `chdir` system call, which takes the path as argument.
+
+### `exit` command
+
+- This command terminates the ByteShell.
+
+### `history` command
+
+- This command shows the various commands from the beginning that were executed in the current shell session.
+- It uses a vector to implement the same.
+### `pwd` command
+
+- It stands for ‘print working directory’, hence showing the current directory.
+- This is implemented using the `getcwd(addr, size)` function of `unistd.h` header file.
+    - where `addr` is address of the first character of the string, of `size` is the size given to the string for storing the path.
+
+
+## References
+
+[ACM, IIT Roorkee](https://github.com/acmiitr)
+
+[Unix Systems call, Tutorialspoint](https://www.tutorialspoint.com/unix_system_calls/waitpid.htm)

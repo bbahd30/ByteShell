@@ -7,6 +7,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <set>
+#include <unistd.h>
 using namespace std;
 
 struct Job
@@ -38,20 +39,24 @@ int changeDirectory(vector<string> args);
 int showHistory(vector<string> args);
 int exitProgram(vector<string> args);
 int background(vector<string> args);
+int foreground(vector<string> args);
 int showJobs(vector<string> args);
 int killProgram(vector<string> args);
 int addAlias(vector<string> args);
 int removeAlias(vector<string> args);
+int pwd(vector<string> args);
 
 map<string, int (*)(vector<string>)> builtins = {
     {"cd", changeDirectory},
     {"exit", exitProgram},
     {"history", showHistory},
     {"bg", background},
+    {"fg", foreground},
     {"jobs", showJobs},
     {"kill", killProgram},
     {"alias", addAlias},
-    {"unalias", removeAlias}};
+    {"unalias", removeAlias},
+    {"pwd", pwd}};
 
 vector<string> split(const string &str, char delimiter)
 {
@@ -89,7 +94,50 @@ int background(vector<string> args)
 {
     if (args.size() < 2)
     {
-        cout << "Error: No job ID specified\n";
+        cout << "ByteShellError: No job ID specified\n";
+        return 1;
+    }
+
+    bool jobFound;
+    if (args[1][0] == '%')
+    {
+        int jobID = stoi(args[1].substr(1));
+        jobFound = false;
+        for (auto &job : jobs)
+        {
+            if (jobID == job.id)
+            {
+                jobFound = true;
+                if (job.status == "stopped")
+                {
+                    int status;
+                    if (kill(job.pid, SIGCONT) == -1)
+                        cout << "ByteShellError:error in resuming process\n";
+                    else
+                    {
+                        cout << "Resuming job: " << job.pid << endl;
+                        job.status = "running";
+                    }
+                    showJobs({""});
+                }
+                else
+                    cout << "ByteShellError: process is already running\n";
+                break;
+            }
+        }
+        if (!jobFound)
+            cout << "ByteShellError: Job ID not found" << endl;
+    }
+    else
+        cout << ": Job ID must be followed by '%'" << endl;
+    return 1;
+}
+
+int foreground(vector<string> args)
+{
+    if (args.size() < 2)
+    {
+        cout << "ByteShellError: No job ID specified\n";
         return 1;
     }
 
@@ -112,8 +160,9 @@ int background(vector<string> args)
                     {
                         cout << "Resuming job: " << job.pid << endl;
                         job.status = "running";
+                        int status;
+                        waitpid(job.pid, &status, 0);
                     }
-                    showJobs({""});
                 }
                 else
                     perror("ByteShellError: process is already running\n");
@@ -121,10 +170,22 @@ int background(vector<string> args)
             }
         }
         if (!jobFound)
-            cout << "Error: Job ID not found" << endl;
+            cout << "ByteShellError: Job ID not found" << endl;
     }
     else
-        cout << "Error: Job ID must be followed by '%'" << endl;
+        cout << "ByteShellError: Job ID must be followed by '%'" << endl;
+    return 1;
+}
+
+string getPath()
+{
+    string cwd("\0", FILENAME_MAX + 1);
+    return getcwd(&cwd[0], cwd.capacity());
+}
+
+int pwd(vector<string> args)
+{
+    cout << getPath() << "\n";
     return 1;
 }
 
@@ -327,7 +388,8 @@ int main()
 
     do
     {
-        char *input = readline("> ");
+        cout << getPath();
+        char *input = readline("$ ");
         line = input;
         free(input);
         if (!line.empty())
