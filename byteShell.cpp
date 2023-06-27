@@ -6,6 +6,7 @@
 #include <map>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <set>
 using namespace std;
 
 struct Job
@@ -27,7 +28,6 @@ vector<Job> jobs;
 int nextJobID = 1;
 
 pid_t currentPID = 0;
-bool currentProcessStopped = false;
 
 vector<string> history;
 int history_index = 0;
@@ -88,18 +88,29 @@ int background(vector<string> args)
     }
 
     bool jobFound;
-    if (args[1][0] == '&')
+    if (args[1][0] == '%')
     {
-        int jobID = stoi(args[1]);
+        int jobID = stoi(args[1].substr(1));
         jobFound = false;
         for (auto &job : jobs)
         {
-            if (job.id == jobID)
+            if (jobID == job.id)
             {
                 jobFound = true;
-                pid_t pid = job.pid;
-                cout << "[" << jobID << "] " << job.command << " &" << endl;
-                kill(pid, SIGCONT);
+                if (job.status == "stopped")
+                {
+                    int status;
+                    if (kill(job.pid, SIGCONT) == -1)
+                        perror("ByteShellError:error in resuming process\n");
+                    else
+                    {
+                        cout << "Resuming job: " << job.pid << endl;
+                        job.status = "running";
+                    }
+                    showJobs({""});
+                }
+                else
+                    perror("ByteShellError: process is already running\n");
                 break;
             }
         }
@@ -132,7 +143,6 @@ void handleSignal(int signal)
                 if (pid == it->pid)
                 {
                     cout << "Background process with PID " << pid << " completed: " << it->command << endl;
-                    showJobs({""});
                     jobs.erase(it);
                     break;
                 }
@@ -141,12 +151,10 @@ void handleSignal(int signal)
     }
     else if (signal == SIGTSTP && currentPID != 0)
     {
-        cout << "Foreground process stopped: " << currentPID << endl;
+        cout << "\nForeground process stopped: " << currentPID << endl;
         Job job(jobs.size() + 1, currentPID, history.back(), "stopped");
         jobs.push_back(job);
-        currentProcessStopped = true;
         showJobs({""});
-        kill(currentPID, SIGSTOP);
     }
 }
 
@@ -172,7 +180,7 @@ int launchExtProgram(vector<string> args, bool backgroundProcess)
         {
             currentPID = pid;
             int status;
-            waitpid(pid, &status, 0);
+            waitpid(pid, &status, WUNTRACED);
             currentPID = 0;
         }
         else
@@ -204,10 +212,15 @@ int execute(vector<string> args)
 
 int showJobs(vector<string> args)
 {
-    cout << "Displaying background jobs" << endl;
-    for (auto &job : jobs)
-        cout << "[" << job.id << "] "
-             << "\t" << job.status << " " << job.command << endl;
+    if (jobs.size() > 0)
+    {
+        cout << "Displaying background jobs" << endl;
+        for (auto &job : jobs)
+            cout << "[" << job.id << "] "
+                 << "\t" << job.status << " " << job.command << endl;
+    }
+    else
+        cout << "No background jobs.\n";
     return 1;
 }
 
