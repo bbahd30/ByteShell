@@ -94,3 +94,16 @@
             
 - When a foreground process is stopped using the `Ctrl+Z`, the process is with status of ‘stopped’ is instantiated and pushed to `jobs` vector
     - the stopped process is resumed and run in background by using the `bg` command, which is implemented by using the `kill(pid, SIGCONT)` system call, which tells that process to restart.
+    
+
+### `alias` command
+
+- It is used to create shortcuts for the long commands.
+- The command is checked whether it is set as an alias or not, while the command entered is examined.
+    - on being set as alias, the expanded command is placed in the vector `expandedAlias` and then the rest of the arguments are added
+    - which then later calls itself, with the expanded arguments.
+
+### `unalias` command
+
+- This removes the set alias.
+- To remove all the aliases, the `-a` flag is used, which has been implement using a map.
