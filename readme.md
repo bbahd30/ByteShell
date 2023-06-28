@@ -1,3 +1,5 @@
+# ByteShell
+
 ## Instructions to run
 
 The ByteShell uses the library readline for arrow based commands display and tab completion. Hence follow these commands to run:
@@ -24,6 +26,8 @@ g++ byteShell.cpp -lreadline
 
 Run the executable file and run commands.
 
+![Untitled](./assets/byteShell.png)
+
 ### Shell Built-ins
 
 - Commands that are built into the shell itself rather than being an external program or utility.
@@ -42,7 +46,8 @@ Run the executable file and run commands.
     
     </aside>
     
-    - `kill(pid, SIGTERM)` ⇒ signals it to terminate the process with specified process ID.
+    ![kill( )](./assets/kill.png)
+    
 
 ### `jobs` command
 
@@ -67,6 +72,8 @@ Run the executable file and run commands.
     
     vector<Job> jobs;
     ```
+    
+    ![jobs](./assets/jobs.png)
     
 
 ### `bg` command
@@ -119,37 +126,69 @@ Run the executable file and run commands.
 - When a foreground process is stopped using the `Ctrl+Z`, the process is with status of ‘stopped’ is instantiated and pushed to `jobs` vector
     - the stopped process is resumed and run in background by using the `bg` command, which is implemented by using the `kill(pid, SIGCONT)` system call, which tells that process to restart.
 
+    ![bg](./assets/bg.png)
+
+### `fg` command
+
+- Similar to `bg` command, we have `fg` which resumes a stopped process in the foreground.
+- This is implemented by sending a signal to resume by `kill` system call to the specified process using pID, and the following command waits till it foreground process completes.
+    
+    ```cpp
+    waitpid(job.pid, &status, 0);
+    ```
+    
+    ![fg( )](./assets/fg.png)
+    
 ### `alias` command
 
 - It is used to create shortcuts for the long commands.
 - The command is checked whether it is set as an alias or not, while the command entered is examined.
     - on being set as alias, the expanded command is placed in the vector `expandedAlias` and then the rest of the arguments are added
     - which then later calls itself, with the expanded arguments.
+    
+    ![alias](./assets/alias.png)
 
 ### `unalias` command
 
 - This removes the set alias.
 - To remove all the aliases, the `-a` flag is used, which has been implement using a map.
 
+    ![unalias](./assets/unalias.png)
+
 ### `cd` command
 
 - `cd` stands for change directory.
 - This is implemented by using the `chdir` system call, which takes the path as argument.
+    
+    ![cd](./assets/cd.png)
+    
 
 ### `exit` command
 
 - This command terminates the ByteShell.
+    
+    ![exit](./assets/exit.png)
+
 
 ### `history` command
 
 - This command shows the various commands from the beginning that were executed in the current shell session.
 - It uses a vector to implement the same.
+    
+    ![history](./assets/history.png)
+
 ### `pwd` command
 
 - It stands for ‘print working directory’, hence showing the current directory.
 - This is implemented using the `getcwd(addr, size)` function of `unistd.h` header file.
     - where `addr` is address of the first character of the string, of `size` is the size given to the string for storing the path.
+    
+    ![pwd](./assets/pwd.png)
 
+### `help` command
+
+- This shows all the built in commands implemented in the ByteShell.
+    ![help](./assets/help.png)
 
 ## References
 

@@ -46,6 +46,7 @@ int killProgram(vector<string> args);
 int addAlias(vector<string> args);
 int removeAlias(vector<string> args);
 int pwd(vector<string> args);
+int help(vector<string> args);
 
 map<string, int (*)(vector<string>)> builtins = {
     {"cd", changeDirectory},
@@ -57,7 +58,8 @@ map<string, int (*)(vector<string>)> builtins = {
     {"kill", killProgram},
     {"alias", addAlias},
     {"unalias", removeAlias},
-    {"pwd", pwd}};
+    {"pwd", pwd},
+    {"help", help}};
 
 vector<string> split(const string &str, char delimiter)
 {
@@ -196,6 +198,24 @@ string getPath()
 int pwd(vector<string> args)
 {
     cout << getPath() << "\n";
+    return 1;
+}
+
+int help(vector<string> args)
+{
+    cout << "Available built-in commands in ByteShell:" << endl;
+    cout << formatText("bold", "blue", "cd <directory>") << "       Changes the current directory" << endl;
+    cout << formatText("bold", "blue", "bg <job_id>") << "          Resumes a stopped background job" << endl;
+    cout << formatText("bold", "blue", "fg <job_id>") << "          Brings a background job to the foreground" << endl;
+    cout << formatText("bold", "blue", "cd <directory>") << "       Changes the current directory" << endl;
+    cout << formatText("bold", "blue", "alias") << "                Prints and sets aliases" << endl;
+    cout << formatText("bold", "blue", "unalias <alias>") << "      Removes an alias" << endl;
+    cout << formatText("bold", "blue", "kill <pid>") << "           Terminates a process using pID" << endl;
+    cout << formatText("bold", "blue", "history") << "              Prints command history" << endl;
+    cout << formatText("bold", "blue", "pwd") << "                  Print the current working directory" << endl;
+    cout << formatText("bold", "blue", "exit") << "                 Exits the shell" << endl;
+    cout << formatText("bold", "blue", "jobs") << "                 Prints background jobs" << endl;
+    cout << formatText("bold", "blue", "help") << "                 Prints this help message" << endl;
     return 1;
 }
 
@@ -377,8 +397,20 @@ int killProgram(vector<string> args)
         return 1;
     }
     int pid = stoi(args[1]);
-    if (kill(pid, SIGTERM) == -1)
-        perror("ByteShell");
+    if (kill(pid, SIGKILL) == 0)
+    {
+        for (auto it = jobs.begin(); it != jobs.end(); ++it)
+        {
+            if (pid == it->pid)
+            {
+                jobs.erase(it);
+                break;
+            }
+        }
+    }
+    else
+        cout << formatText("bold", "red", "ByteShellError: Error in killing process\n");
+
     return 1;
 }
 
