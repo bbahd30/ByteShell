@@ -8,6 +8,7 @@
 #include <readline/history.h>
 #include <set>
 #include <unistd.h>
+#include "colorize.cpp"
 using namespace std;
 
 struct Job
@@ -70,11 +71,11 @@ vector<string> split(const string &str, char delimiter)
 
 int changeDirectory(vector<string> args)
 {
-    cout << "Changing Directory\n";
+    cout << formatText("bold", "blue", "Changing Directory\n");
     if (args.size() < 2)
-        cout << "ByteShellError: Expected argument to \"cd\"" << endl;
+        chdir(getenv("HOME"));
     else if (chdir(args[1].c_str()) != 0)
-        perror("ByteShellError");
+        cout << formatText("bold", "red", "ByteShellError: Error in changing directory\n");
     return 1;
 }
 
@@ -94,7 +95,7 @@ int background(vector<string> args)
 {
     if (args.size() < 2)
     {
-        cout << "ByteShellError: No job ID specified\n";
+        cout << formatText("bold", "red", "ByteShellError: No job ID specified\n");
         return 1;
     }
 
@@ -112,24 +113,25 @@ int background(vector<string> args)
                 {
                     int status;
                     if (kill(job.pid, SIGCONT) == -1)
-                        cout << "ByteShellError:error in resuming process\n";
+                        cout << formatText("bold", "red", "ByteShellError:error in resuming process\n");
+
                     else
                     {
-                        cout << "Resuming job: " << job.pid << endl;
                         job.status = "running";
+                        cout << formatText("bold", "blue", "Resuming job: " + to_string(job.pid) + " in background.\n");
                     }
                     showJobs({""});
                 }
                 else
-                    cout << "ByteShellError: process is already running\n";
+                    cout << formatText("bold", "red", "ByteShellError: process is already running\n");
                 break;
             }
         }
         if (!jobFound)
-            cout << "ByteShellError: Job ID not found" << endl;
+            cout << formatText("bold", "red", "ByteShellError: Job ID not found\n");
     }
     else
-        cout << ": Job ID must be followed by '%'" << endl;
+        cout << formatText("bold", "red", "ByteShellError: : Job ID must be followed by '%'");
     return 1;
 }
 
@@ -137,7 +139,7 @@ int foreground(vector<string> args)
 {
     if (args.size() < 2)
     {
-        cout << "ByteShellError: No job ID specified\n";
+        cout << formatText("bold", "red", "ByteShellError: No job ID specified\n");
         return 1;
     }
 
@@ -155,25 +157,33 @@ int foreground(vector<string> args)
                 {
                     int status;
                     if (kill(job.pid, SIGCONT) == -1)
-                        perror("ByteShellError:error in resuming process\n");
+                        cout << formatText("bold", "red", "ByteShellError:error in resuming process\n");
                     else
                     {
-                        cout << "Resuming job: " << job.pid << endl;
+                        cout << formatText("bold", "blue", "Resuming job: " + to_string(job.pid) + " in foreground.\n");
                         job.status = "running";
                         int status;
+                        for (auto it = jobs.begin(); it != jobs.end(); ++it)
+                        {
+                            if (job.pid == it->pid)
+                            {
+                                jobs.erase(it);
+                                break;
+                            }
+                        }
                         waitpid(job.pid, &status, 0);
                     }
                 }
                 else
-                    perror("ByteShellError: process is already running\n");
+                    cout << formatText("bold", "red", "ByteShellError: process is already running\n");
                 break;
             }
         }
         if (!jobFound)
-            cout << "ByteShellError: Job ID not found" << endl;
+            cout << formatText("bold", "red", "ByteShellError: Job ID not found\n");
     }
     else
-        cout << "ByteShellError: Job ID must be followed by '%'" << endl;
+        cout << formatText("bold", "red", "ByteShellError: Job ID must be followed by '%'\n");
     return 1;
 }
 
@@ -195,7 +205,7 @@ int addAlias(vector<string> args)
     {
         if (aliasList.size() > 0)
         {
-            cout << "Showing list of aliases\n";
+            cout << formatText("bold", "blue", "Showing list of aliases\n");
             for (auto alias : aliasList)
                 cout << alias.first << " = " << alias.second << endl;
             return 1;
@@ -214,7 +224,7 @@ int addAlias(vector<string> args)
         aliasList[alias] = cmd;
     }
     else
-        cout << "use 'alias <name>=<command>' to add\n ";
+        cout << "Use 'alias <name>=<command>' to add\n";
     return 1;
 }
 
@@ -242,14 +252,14 @@ int removeAlias(vector<string> args)
         if (it != aliasList.end())
             aliasList.erase(it);
         else
-            cout << "ByteShellError: alias not found.\n";
+            cout << formatText("bold", "red", "ByteShellError: alias not found.\n");
     }
     return 1;
 }
 
 int showHistory(vector<string> args)
 {
-    cout << "Showing history\n";
+    cout << formatText("bold", "blue", "Showing history\n");
     for (auto &command : history)
         cout << command << endl;
     return 1;
@@ -267,7 +277,7 @@ void handleSignal(int signal)
             {
                 if (pid == it->pid)
                 {
-                    cout << "Background process with PID " << pid << " completed: " << it->command << endl;
+                    cout << "Background process with PID " << pid << " completed: '" << formatText("bold", "blue", it->command) << "'\n";
                     jobs.erase(it);
                     break;
                 }
@@ -294,11 +304,11 @@ int launchExtProgram(vector<string> args, bool backgroundProcess)
     if (pid == 0)
     {
         if (execvp(charArgs[0], charArgs.data()) == -1)
-            perror("ByteShellError");
+            cout << formatText("bold", "red", "ByteShellError: Command not found.\n");
         exit(EXIT_FAILURE);
     }
     else if (pid < 0)
-        perror("ByteShellError");
+        cout << formatText("bold", "red", "ByteShellError: Error in forking process\n");
     else
     {
         if (!backgroundProcess)
@@ -312,7 +322,8 @@ int launchExtProgram(vector<string> args, bool backgroundProcess)
         {
             Job job(jobs.size() + 1, pid, command(args));
             jobs.push_back(job);
-            cout << "'" << command(args) << "' command initialized with PID: " << pid << endl;
+            cout << "'" << formatText("bold", "blue", command(args)) << "' command initialized with PID: " << pid << endl;
+            showJobs({""});
         }
         return 1;
     }
@@ -388,8 +399,9 @@ int main()
 
     do
     {
-        cout << getPath();
-        char *input = readline("$ ");
+        cout << formatText("bold", "cyan", "BBAHD's ByteShell:");
+        cout << formatText("bold", "green", getPath());
+        char *input = readline(formatText("bold", "green", "$ ").c_str());
         line = input;
         free(input);
         if (!line.empty())
